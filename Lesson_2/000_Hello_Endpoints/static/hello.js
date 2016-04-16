@@ -11,7 +11,7 @@
 
 	/**
 	 * After the client library has loaded, this init() function is called.
-	 * The init() function loads the helloworldendpoints API.
+	 * The init() function loads the hello_world_endpoint API.
 	 */
 
 	function init() {
@@ -25,16 +25,16 @@
 
 		var rootpath = "//" + window.location.host + "/_ah/api";
 
-		// Load the helloworldendpoints API
+		// Load the hello_world_endpoint API
 		// If loading completes successfully, call loadCallback function
-		gapi.client.load('helloworldendpoints', 'v1', function() {
+		gapi.client.load('hello_world_endpoint', 'v1', function() {
 
 			/*
-			 * When helloworldendpoints API has loaded, this callback is called.
+			 * When hello_world_endpoint API has loaded, this callback is called.
 			 * 
-			 * We need to wait until the helloworldendpoints API has loaded to
+			 * We need to wait until the hello_world_endpoint API has loaded to
 			 * enable the actions for the buttons in index.html,
-			 * because the buttons call functions in the helloworldendpoints API
+			 * because the buttons call functions in the hello_world_endpoint API
 			 */
 			// Enable the button actions
 			enableButtons();
@@ -65,7 +65,7 @@
 			 * Execute a request to the sayHello() endpoints function
 			 */
 			// Construct the request for the sayHello() function
-			var request = gapi.client.helloworldendpoints.sayHello();
+			var request = gapi.client.hello_world_endpoint.sayHello();
 
 			// Execute the request. On success, pass the response to sayHelloCallback()
 			request.execute(sayHelloCallback);
@@ -84,7 +84,7 @@
 			// Call the sayHelloByName() function.
 			// It takes one argument "name"
 			// On success, pass the response to sayHelloCallback()
-			var request = gapi.client.helloworldendpoints.sayHelloByName({
+			var request = gapi.client.hello_world_endpoint.sayHelloByName({
 				'name': name
 			});
 
@@ -104,7 +104,7 @@
 			// Call the sayHelloWithAge() function.
 			// It takes one argument "name"
 			// On success, pass the response to sayHelloCallback()
-			var request = gapi.client.helloworldendpoints.sayHelloWithAge({
+			var request = gapi.client.hello_world_endpoint.sayHelloWithAge({
 				'age': age
 			});
 
