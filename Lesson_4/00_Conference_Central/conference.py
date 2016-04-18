@@ -20,12 +20,15 @@ from protorpc import messages
 from protorpc import message_types
 from protorpc import remote
 
+
 from google.appengine.ext import ndb
 
 from models import Profile
 from models import ProfileMiniForm
 from models import ProfileForm
 from models import TeeShirtSize
+from models import BooleanMessage
+from models import ConflictException
 
 from utils import getUserId
 
@@ -40,12 +43,33 @@ from models import ConferenceQueryForms
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 
+CONF_GET_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    websafeConferenceKey=messages.StringField(1),
+)
+
 DEFAULTS = {
     "city": "Default City",
     "maxAttendees": 0,
     "seatsAvailable": 0,
     "topics": [ "Default", "Topic" ],
 }
+
+OPERATORS = {
+            'EQ':   '=',
+            'GT':   '>',
+            'GTEQ': '>=',
+            'LT':   '<',
+            'LTEQ': '<=',
+            'NE':   '!='
+            }
+
+FIELDS =    {
+            'CITY': 'city',
+            'TOPIC': 'topics',
+            'MONTH': 'month',
+            'MAX_ATTENDEES': 'maxAttendees',
+            }
 
 @endpoints.api( name='conference',
                 version='v1',
@@ -182,6 +206,7 @@ class ConferenceApi(remote.Service):
 
         # make Profile Key from user ID
         p_key = ndb.Key(Profile, user_id)
+        # https://cloud.google.com/appengine/docs/python/ndb/entities#creating_entities
         # allocate new Conference ID with Profile key as parent
         c_id = Conference.allocate_ids(size=1, parent=p_key)[0]
         # make Conference key from ID
@@ -194,6 +219,53 @@ class ConferenceApi(remote.Service):
 
         return request
 
+    def _getQuery(self, request):
+        """Return formatted query from the submitted filters."""
+        q = Conference.query()
+        inequality_filter, filters = self._formatFilters(request.filters)
+
+        # If exists, sort on inequality filter first
+        if not inequality_filter:
+            q = q.order(Conference.name)
+        else:
+            q = q.order(ndb.GenericProperty(inequality_filter))
+            q = q.order(Conference.name)
+
+        for filtr in filters:
+            if filtr["field"] in ["month", "maxAttendees"]:
+                filtr["value"] = int(filtr["value"])
+            formatted_query = ndb.query.FilterNode(filtr["field"], filtr["operator"], filtr["value"])
+            q = q.filter(formatted_query)
+        return q
+
+
+    def _formatFilters(self, filters):
+        """Parse, check validity and format user supplied filters."""
+        formatted_filters = []
+        inequality_field = None
+
+        for f in filters:
+            filtr = {field.name: getattr(f, field.name) for field in f.all_fields()}
+
+            try:
+                filtr["field"] = FIELDS[filtr["field"]]
+                filtr["operator"] = OPERATORS[filtr["operator"]]
+            except KeyError:
+                raise endpoints.BadRequestException("Filter contains invalid field or operator.")
+
+            # Every operation except "=" is an inequality
+            if filtr["operator"] != "=":
+                # check if inequality operation has been used in previous filters
+                # disallow the filter if inequality was performed on a different field before
+                # track the field on which the inequality operation is performed
+                if inequality_field and inequality_field != filtr["field"]:
+                    raise endpoints.BadRequestException("Inequality filter is allowed on only one field.")
+                else:
+                    inequality_field = filtr["field"]
+
+            formatted_filters.append(filtr)
+        return (inequality_field, formatted_filters)
+
     @endpoints.method(ConferenceForm, ConferenceForm, path='conference', http_method='POST', name='createConference')
     def createConference(self, request):
         """Create new conference."""
@@ -202,8 +274,11 @@ class ConferenceApi(remote.Service):
     @endpoints.method(ConferenceQueryForms, ConferenceForms, path='queryConferences', http_method='POST', name='queryConferences')
     def queryConferences(self, request):
         """Query for conferences."""
-        conferences = Conference.query()
-         # return individual ConferenceForm object per Conference
+
+        conferences = self._getQuery(request)
+
+        # return individual ConferenceForm object per Conference
+
         return ConferenceForms(items=[self._copyConferenceToForm(conf, "") for conf in conferences])
 
     @endpoints.method(message_types.VoidMessage, ConferenceForms, path='getConferencesCreated', http_method='GET', name='getConferencesCreated')
@@ -237,14 +312,74 @@ class ConferenceApi(remote.Service):
         filter1 = ndb.query.FilterNode('city', '=', 'London')
         # filter2 = ndb.query.FilterNode('topics', '=', 'Medical Innovations')
 
-        q = Conference.query(ancestor=p_key).filter(filter1)
-        q = q.filter(Conference.topics.IN(['Medical Innovations', 'Web Technologies']))
-        q = q.filter(ndb.OR(Conference.month == 7, Conference.month == 6))
-        q = q.order(Conference.name)
+        # filter(ndb.OR(Conference.month == 7, Conference.month == 6)).\
+        # filter(Conference.maxAttendees < 1000).\
+
+        q = Conference.query(ancestor=p_key).\
+            filter(filter1).\
+            filter(Conference.topics.IN(['Medical Innovations', 'Web Technologies'])).\
+            filter(Conference.seatsAvailable >= 100).\
+            filter(Conference.seatsAvailable <= 700).\
+            order(Conference.seatsAvailable).\
+            order(Conference.name)
 
         displayName = getattr(profile, 'displayName', '')
 
         return ConferenceForms(items=[self._copyConferenceToForm(conf, displayName) for conf in q])
+
+    @ndb.transactional(xg=True)
+    def _conferenceRegistration(self, request, reg=True):
+        """Register or unregister user for selected conference."""
+        retval = None
+        prof = self._getProfileFromUser() # get user Profile
+
+        # check if conf exists given websafeConfKey
+        # get conference; check that it exists
+        wsck = request.websafeConferenceKey
+        conf = ndb.Key(urlsafe=wsck).get()
+        if not conf:
+            raise endpoints.NotFoundException(
+                'No conference found with key: %s' % wsck)
+
+        # register
+        if reg:
+            # check if user already registered otherwise add
+            if wsck in prof.conferenceKeysToAttend:
+                raise ConflictException(
+                    "You have already registered for this conference")
+
+            # check if seats avail
+            if conf.seatsAvailable <= 0:
+                raise ConflictException(
+                    "There are no seats available.")
+
+            # register user, take away one seat
+            prof.conferenceKeysToAttend.append(wsck)
+            conf.seatsAvailable -= 1
+            retval = True
+
+        # unregister
+        else:
+            # check if user already registered
+            if wsck in prof.conferenceKeysToAttend:
+
+                # unregister user, add back one seat
+                prof.conferenceKeysToAttend.remove(wsck)
+                conf.seatsAvailable += 1
+                retval = True
+            else:
+                retval = False
+
+        # write things back to the datastore & return
+        prof.put()
+        conf.put()
+        return BooleanMessage(data=retval)
+
+    @endpoints.method(CONF_GET_REQUEST, BooleanMessage, path='conference/{websafeConferenceKey}', http_method='POST', name='registerForConference')
+    def registerForConference(self, request):
+        """Register user for selected conference."""
+        return self._conferenceRegistration(request)
+
 
 # TODO
 

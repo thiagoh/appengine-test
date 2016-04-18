@@ -11,6 +11,11 @@ indexes:
 # your application using appcfg.py.
 
 - kind: Conference
+  properties:
+  - name: city
+  - name: name
+
+- kind: Conference
   ancestor: yes
   properties:
   - name: city
@@ -29,4 +34,12 @@ indexes:
   ancestor: yes
   properties:
   - name: city
+  - name: name
+
+- kind: Conference
+  ancestor: yes
+  properties:
+  - name: city
+  - name: topics
+  - name: seatsAvailable
   - name: name
