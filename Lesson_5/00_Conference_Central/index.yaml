@@ -12,6 +12,11 @@ indexes:
 
 - kind: Conference
   properties:
+  - name: seatsAvailable
+  - name: name
+
+- kind: Conference
+  properties:
   - name: city
   - name: maxAttendees
   - name: month
