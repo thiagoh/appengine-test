@@ -4,6 +4,8 @@
 
 Udacity conference server-side Python App Engine data & ProtoRPC models
 
+https://docs.google.com/document/d/1H9anIDV4QCPttiQEwpGe6MnMBx92XCOlz0B4ciD7lOs/pub
+
 $Id: models.py,v 1.1 2014/05/24 22:01:10 wesc Exp $
 
 created/forked from conferences.py by wesc on 2014 may 24
