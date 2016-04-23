@@ -10,11 +10,12 @@ created/forked from conferences.py by wesc on 2014 may 24
 
 """
 
-__author__ = 'wesc+api@google.com (Wesley Chun)'
+__author__ = 'thiagoh@gmail.com (Thiago Andrade)'
 
 import httplib
 import endpoints
 from protorpc import messages
+from protorpc import message_types
 from google.appengine.ext import ndb
 
 class ConflictException(endpoints.ServiceException):
@@ -60,11 +61,32 @@ class Conference(ndb.Model):
 class Session(ndb.Model):
     """Session -- Session object"""
     name            = ndb.StringProperty(required=True)
-    startDate       = ndb.DateProperty()
-    endDate         = ndb.DateProperty()
-    duration        = ndb.IntegerProperty() # in hours
-    sessionType     = ndb.StringProperty() # workshop, lecture
+    highlights      = ndb.StringProperty()
+    speakerKey      = ndb.StringProperty(required=True)
+    startDate       = ndb.DateTimeProperty()
+    duration        = ndb.IntegerProperty() # in minutes
+    typeOfSession   = ndb.StringProperty() # workshop, lecture
     location        = ndb.StringProperty()
+
+class Speaker(ndb.Model):
+    """Speaker -- Speaker object"""
+    name            = ndb.StringProperty(required=True)
+    organization    = ndb.StringProperty(repeated=True)
+
+class SessionForm(messages.Message):
+    """SessionForm -- Session outbound form message"""
+    name            = messages.StringField(1)
+    speakerWSKey    = messages.IntegerField(2)
+    highlights      = messages.StringField(3)
+    typeOfSession   = messages.StringField(4)
+    startDate       = message_types.DateTimeField(5)
+    duration        = messages.IntegerField(6)
+    sessionWSKey    = messages.StringField(7)
+    speakerName     = messages.StringField(8)
+
+class SessionForms(messages.Message):
+    """SessionForms -- multiple Session outbound form message"""
+    items = messages.MessageField(SessionForm, 1, repeated=True)
 
 class ConferenceForm(messages.Message):
     """ConferenceForm -- Conference outbound form message"""
