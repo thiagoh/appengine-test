@@ -4,14 +4,15 @@
 conference.py -- Udacity conference server-side Python App Engine API;
     uses Google Cloud Endpoints
 
+https://docs.google.com/document/d/1H9anIDV4QCPttiQEwpGe6MnMBx92XCOlz0B4ciD7lOs/pub
+
 $Id: conference.py,v 1.25 2014/05/24 23:42:19 wesc Exp wesc $
 
 created by wesc on 2014 apr 21
 
 """
 
-__author__ = 'wesc+api@google.com (Wesley Chun)'
-
+__author__ = 'thiagoh@gmail.com (Thiago Andrade)'
 
 from datetime import datetime
 
