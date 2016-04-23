@@ -57,6 +57,15 @@ class Conference(ndb.Model):
     maxAttendees    = ndb.IntegerProperty()
     seatsAvailable  = ndb.IntegerProperty()
 
+class Session(ndb.Model):
+    """Session -- Session object"""
+    name            = ndb.StringProperty(required=True)
+    startDate       = ndb.DateProperty()
+    endDate         = ndb.DateProperty()
+    duration        = ndb.IntegerProperty() # in hours
+    sessionType     = ndb.StringProperty() # workshop, lecture
+    location        = ndb.StringProperty()
+
 class ConferenceForm(messages.Message):
     """ConferenceForm -- Conference outbound form message"""
     name            = messages.StringField(1)
