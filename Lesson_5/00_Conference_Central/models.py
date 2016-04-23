@@ -76,7 +76,7 @@ class Speaker(ndb.Model):
 class SessionForm(messages.Message):
     """SessionForm -- Session outbound form message"""
     name            = messages.StringField(1)
-    speakerWSKey    = messages.IntegerField(2)
+    speakerWSKey    = messages.StringField(2)
     highlights      = messages.StringField(3)
     typeOfSession   = messages.StringField(4)
     startDate       = message_types.DateTimeField(5)

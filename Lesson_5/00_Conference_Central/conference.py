@@ -133,6 +133,7 @@ class ConferenceApi(remote.Service):
 
 # - - - Session - - - - - - - - - - - - - - - - - - - - - - -
 
+    @staticmethod
     def _copySessionToForm(session):
         """Copy relevant fields from Session to SessionForm."""
         sessionForm = SessionForm()
@@ -142,7 +143,7 @@ class ConferenceApi(remote.Service):
             elif field.name == "sessionWSKey":
                 setattr(sessionForm, field.name, session.key.urlsafe())
             elif field.name == "speakerWSKey":
-                setattr(sessionForm, field.name, session.speakerKey.urlsafe())
+                setattr(sessionForm, field.name, session.speakerKey)
         sessionForm.check_initialized()
         return sessionForm
 
@@ -185,7 +186,7 @@ class ConferenceApi(remote.Service):
 
         return SessionForms(items=[ConferenceApi._copySessionToForm(session) for session in sessions])
 
-    @endpoints.method(CONF_POST_SESSION_REQUEST, SessionForms, path='conference/{conferenceWSKey}/session/create', http_method='POST', name='createSession')
+    @endpoints.method(CONF_POST_SESSION_REQUEST, SessionForm, path='conference/{conferenceWSKey}/session/create', http_method='POST', name='createSession')
     def createSession(self, request):
         """open only to the organizer of the conference"""
 
@@ -206,26 +207,29 @@ class ConferenceApi(remote.Service):
         if not request.name:
             raise endpoints.BadRequestException("Session 'name' field required")
 
-        speakerKey = None
+        speaker_wskey = None
         if not request.speakerWSKey:
             if request.speakerName:
-
                 speaker = Speaker.query(Speaker.name == request.speakerName).get()
+                if speaker:
+                    speaker_wskey = speaker.key.urlsafe()
+                else:
+                    speaker_id = Speaker.allocate_ids(size=1)[0]
+                    speaker_key = ndb.Key(Speaker, speaker_id)
+                    speaker_wskey = speaker_key.urlsafe()
 
-                if not speaker:
-                    raise endpoints.BadRequestException("No such speaker with this name")
-
-                speakerKey = speaker.key
-
+                    speaker = Speaker(**{'key': speaker_key,'name': request.speakerName})
+                    speaker.put()
             else:
                 raise endpoints.BadRequestException("Session speaker required")
         else:
-            speakerKey = ndb.Key(urlsafe=request.speakerWSKey)
+            speaker_wskey = request.speakerWSKey
 
         # copy SessionForm/ProtoRPC Message into dict
         data = {field.name: getattr(request, field.name) for field in request.all_fields()}
         del data['sessionWSKey']
         del data['speakerWSKey']
+        del data['speakerName']
         del data['conferenceWSKey']
 
         print '1:' + str(data.keys())
@@ -243,6 +247,7 @@ class ConferenceApi(remote.Service):
         session_id = Session.allocate_ids(size=1, parent=conference.key)[0]
         session_key = ndb.Key(Session, session_id, parent=conference.key)
         data['key'] = session_key
+        data['speakerKey'] = speaker_wskey  
 
         # create Session, send email to organizer confirming creation of Session & return (modified) SessionForm
         session = Session(**data)
@@ -250,7 +255,7 @@ class ConferenceApi(remote.Service):
 
         # taskqueue.add(params={'email': user.email(), 'conferenceInfo': repr(request)}, url='/tasks/send_confirmation_email')
 
-        return sessions
+        return session
 
 # - - - Announcment objects - - - - - - - - - - - - - - - - -
 
