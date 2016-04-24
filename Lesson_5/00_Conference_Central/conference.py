@@ -38,6 +38,7 @@ from models import ConferenceQueryForms
 from models import TeeShirtSize
 from models import StringMessage
 from models import Session
+from models import Wishlist
 from models import Speaker
 from models import SessionForm
 from models import SessionForms
@@ -104,6 +105,11 @@ CONF_POST_REQUEST = endpoints.ResourceContainer(
 CONF_POST_SESSION_REQUEST = endpoints.ResourceContainer(
     SessionForm,
     conferenceWSKey=messages.StringField(1),
+)
+
+CONF_GET_REQUEST_SESSION_KEY = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    sessionWSKey=messages.StringField(1),
 )
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -636,26 +642,72 @@ class ConferenceApi(remote.Service):
             names[profile.key.id()] = profile.displayName
 
         # return set of ConferenceForm objects per Conference
-        return ConferenceForms(items=[self._copyConferenceToForm(conf, names[conf.organizerUserId])\
-         for conf in conferences]
-        )
+        return ConferenceForms(items=[self._copyConferenceToForm(conf, names[conf.organizerUserId]) for conf in conferences])
 
 
-    @endpoints.method(CONF_GET_REQUEST, BooleanMessage,
-            path='conference/{conferenceWSKey}',
-            http_method='POST', name='registerForConference')
+    @endpoints.method(CONF_GET_REQUEST, BooleanMessage, path='conference/{conferenceWSKey}', http_method='POST', name='registerForConference')
     def registerForConference(self, request):
         """Register user for selected conference."""
         return self._conferenceRegistration(request)
 
 
-    @endpoints.method(CONF_GET_REQUEST, BooleanMessage,
-            path='conference/{conferenceWSKey}',
-            http_method='DELETE', name='unregisterFromConference')
+    @endpoints.method(CONF_GET_REQUEST, BooleanMessage, path='conference/{conferenceWSKey}', http_method='DELETE', name='unregisterFromConference')
     def unregisterFromConference(self, request):
         """Unregister user for selected conference."""
         return self._conferenceRegistration(request, reg=False)
 
+
+    @endpoints.method(CONF_GET_REQUEST_SESSION_KEY, BooleanMessage, path='session/{sessionWSKey}/wishlist/add', http_method='POST', name='addSessionToWishlist')
+    def addSessionToWishlist(self, request):
+        """Adds the session to the user's list of sessions they are interested in attending."""
+
+        session_key = ndb.Key(urlsafe=request.sessionWSKey)
+
+        # print 'session_key.kind(): ' + session_key.kind() + str(type(session_key.kind()))
+
+        if session_key.kind() != 'Session':
+            raise endpoints.BadRequestException("Session key is invalid")
+
+        if not session_key.get():
+            raise endpoints.NotFoundException("Session was not found")
+
+        # session = session_key.get()
+
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException('Authorization required')
+
+        wishlist = self._getWithlistByUserId(getUserId(user))
+
+        wishlist.sessionKeysToAttend.append(request.sessionWSKey)
+        wishlist.put()
+
+        return BooleanMessage(data=True)
+
+    @endpoints.method(message_types.VoidMessage, SessionForms, path='session/wishlist/list', http_method='GET', name='getSessionsInWishlist')
+    def getSessionsInWishlist(self, request):
+        """Query for all the sessions in a conference that the user is interested in"""
+
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException('Authorization required')
+
+        wishlist = self._getWithlistByUserId(getUserId(user))
+        keys = [ndb.Key(urlsafe=wkey) for wkey in wishlist.sessionKeysToAttend]
+        sessions = ndb.get_multi(keys)
+
+        return SessionForms(items=[self._copySessionToForm(session) for session in sessions])
+
+    def _getWithlistByUserId(self, user_id):
+
+        wishlist_key = ndb.Key(Wishlist, user_id)
+        wishlist = wishlist_key.get()
+
+        if not wishlist:
+            wishlist = Wishlist(key=wishlist_key)
+            wishlist.put()
+
+        return wishlist
 
 # - - - Announcements - - - - - - - - - - - - - - - - - - - -
 
