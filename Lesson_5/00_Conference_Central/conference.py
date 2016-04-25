@@ -698,6 +698,32 @@ class ConferenceApi(remote.Service):
 
         return SessionForms(items=[self._copySessionToForm(session) for session in sessions])
 
+    @endpoints.method(CONF_GET_REQUEST_SESSION_KEY, BooleanMessage, path='session/{sessionWSKey}/wishlist/delete', http_method='DELETE', name='deleteSessionInWishlist')
+    def deleteSessionInWishlist(self, request):
+        '''Removes the session from the user's list of sessions they are interested in attending'''
+
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException('Authorization required')
+
+        session_key = ndb.Key(urlsafe=request.sessionWSKey)
+
+        if session_key.kind() != 'Session':
+            raise endpoints.BadRequestException("Session key is invalid")
+
+        if not session_key.get():
+            raise endpoints.NotFoundException("Session was not found")
+
+        wishlist = self._getWithlistByUserId(getUserId(user))
+
+        if request.sessionWSKey in wishlist.sessionKeysToAttend:
+            wishlist.sessionKeysToAttend.remove(request.sessionWSKey)
+            wishlist.put()
+            return BooleanMessage(data=True)
+
+        return BooleanMessage(data=False)
+
+
     def _getWithlistByUserId(self, user_id):
 
         wishlist_key = ndb.Key(Wishlist, user_id)
