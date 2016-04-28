@@ -24,6 +24,7 @@ class ConflictException(endpoints.ServiceException):
     """ConflictException -- exception mapped to HTTP 409 response"""
     http_status = httplib.CONFLICT
 
+
 class Profile(ndb.Model):
     """Profile -- User profile object"""
     displayName = ndb.StringProperty()
@@ -31,9 +32,13 @@ class Profile(ndb.Model):
     teeShirtSize = ndb.StringProperty(default='NOT_SPECIFIED')
     conferenceKeysToAttend = ndb.StringProperty(repeated=True)
 
+
 class Wishlist(ndb.Model):
     """Wishlist -- User wishlist object"""
     sessionKeysToAttend = ndb.StringProperty(repeated=True)
+    # https://cloud.google.com/appengine/docs/python/ndb/entity-property-reference#computed
+    sessionKeysToAttendCount = ndb.ComputedProperty(lambda e: len(e.sessionKeysToAttend))
+
 
 class ProfileMiniForm(messages.Message):
     """ProfileMiniForm -- update Profile form message"""
@@ -63,6 +68,7 @@ class Conference(ndb.Model):
     endDate         = ndb.DateProperty()
     maxAttendees    = ndb.IntegerProperty()
     seatsAvailable  = ndb.IntegerProperty()
+    createdDate     = ndb.DateTimeProperty()
 
 class Session(ndb.Model):
     """Session -- Session object"""
@@ -70,6 +76,7 @@ class Session(ndb.Model):
     highlights      = ndb.StringProperty()
     speakerKey      = ndb.StringProperty(required=True)
     startDate       = ndb.DateTimeProperty()
+    startDateHour   = ndb.ComputedProperty(lambda d: d.startDate.hour if d.startDate != None else 0)
     duration        = ndb.IntegerProperty() # in minutes
     typeOfSession   = ndb.StringProperty() # workshop, lecture
     location        = ndb.StringProperty()
@@ -86,9 +93,10 @@ class SessionForm(messages.Message):
     highlights      = messages.StringField(3)
     typeOfSession   = messages.StringField(4)
     startDate       = message_types.DateTimeField(5)
-    duration        = messages.IntegerField(6)
-    sessionWSKey    = messages.StringField(7)
-    speakerName     = messages.StringField(8)
+    startDateHour   = messages.IntegerField(6)
+    duration        = messages.IntegerField(7)
+    sessionWSKey    = messages.StringField(8)
+    speakerName     = messages.StringField(9)
 
 class SessionForms(messages.Message):
     """SessionForms -- multiple Session outbound form message"""
