@@ -17,6 +17,8 @@ __author__ = 'thiagoh@gmail.com (Thiago Andrade)'
 from datetime import datetime
 
 import endpoints
+import types
+
 from protorpc import messages
 from protorpc import message_types
 from protorpc import remote
@@ -237,6 +239,7 @@ class ConferenceApi(remote.Service):
         del data['speakerWSKey']
         del data['speakerName']
         del data['conferenceWSKey']
+        del data['startDateHour']
 
         print '1:' + str(data.keys())
 
@@ -247,8 +250,8 @@ class ConferenceApi(remote.Service):
                 setattr(request, df, SESSION_DEFAULTS[df])
 
         # convert dates from strings to Date objects; set month based on start_date
-        if data['startDate']:
-            data['startDate'] = datetime.strptime(data['startDate'][:10], "%Y-%m-%d").date()
+        if data['startDate'] and isinstance(data['startDate'], types.StringType):
+            data['startDate'] = datetime.strptime(data['startDate'][:10], "%Y-%m-%d").datetime()
 
         session_id = Session.allocate_ids(size=1, parent=conference.key)[0]
         session_key = ndb.Key(Session, session_id, parent=conference.key)
@@ -738,6 +741,19 @@ class ConferenceApi(remote.Service):
 
         return BooleanMessage(data=False)
 
+
+    @staticmethod
+    def _getNewestConferences(many=3):
+        """Retrieves the N newest conferences that still have places available."""
+        return Conference.query(ndb.AND(Conference.seatsAvailable > 0)).order(Conference.createdDate).fetch(many)
+
+
+    @staticmethod
+    def _getMostEngagedUsers(many=3):
+        """Retrieves the N newest conferences that still have places available."""
+        wishlists = Wishlist.query().order(Wishlist.sessionKeysToAttendCount).fetch(many)
+        user_keys = [ndb.Key(User, wishlist.key().id()) for wishlist in wishlists]
+        return ndb.get_multi(user_keys)
 
     def _getWithlistByUserId(self, user_id):
 
