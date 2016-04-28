@@ -118,7 +118,7 @@ CONF_GET_REQUEST_SESSION_KEY = endpoints.ResourceContainer(
 class ConferenceApi(remote.Service):
     """Conference API v0.1"""
 
-    # - - - Announcements - - - - - - - - - - - - - - - - - - - -
+# - - - Announcements - - - - - - - - - - - - - - - - - - - -
 
     @staticmethod
     def _cacheAnnouncement():
@@ -126,8 +126,7 @@ class ConferenceApi(remote.Service):
         confs = Conference.query(ndb.AND(Conference.seatsAvailable <= 5,Conference.seatsAvailable > 0)).fetch(projection=[Conference.name])
 
         if confs:
-            # If there are almost sold out conferences,
-            # format announcement and set it in memcache
+            # If there are almost sold out conferences, format announcement and set it in memcache
             announcement = '%s %s' % ('Last chance to attend! The following conferences are nearly sold out:', ', '.join(conf.name for conf in confs))
             memcache.set(MEMCACHE_ANNOUNCEMENTS_KEY, announcement)
         else:
@@ -698,6 +697,22 @@ class ConferenceApi(remote.Service):
 
         return SessionForms(items=[self._copySessionToForm(session) for session in sessions])
 
+    @endpoints.method(message_types.VoidMessage, SessionForms, path='session/wishlist/most/list', http_method='GET', name='getSessionsInMostWishlists')
+    def getSessionsInMostWishlists(self, request):
+        """Query top five sessions that are in most wishlists"""
+
+        sessions = Wishlist.query().group_by([Wishlist.sessionKeysToAttend]) Session.query()..filter(Session.typeOfSession == request.typeOfSession)
+
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException('Authorization required')
+
+        wishlist = self._getWithlistByUserId(getUserId(user))
+        keys = [ndb.Key(urlsafe=wkey) for wkey in wishlist.sessionKeysToAttend]
+        sessions = ndb.get_multi(keys)
+
+        return SessionForms(items=[self._copySessionToForm(session) for session in sessions])
+
     @endpoints.method(CONF_GET_REQUEST_SESSION_KEY, BooleanMessage, path='session/{sessionWSKey}/wishlist/delete', http_method='DELETE', name='deleteSessionInWishlist')
     def deleteSessionInWishlist(self, request):
         '''Removes the session from the user's list of sessions they are interested in attending'''
@@ -736,7 +751,5 @@ class ConferenceApi(remote.Service):
         return wishlist
 
 # - - - Announcements - - - - - - - - - - - - - - - - - - - -
-
-# TODO 1
 
 api = endpoints.api_server([ConferenceApi]) # register API

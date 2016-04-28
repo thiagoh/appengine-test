@@ -560,7 +560,7 @@ conferenceApp.controllers.controller('ConferenceDetailCtrl', function ($scope, $
     $scope.init = function () {
         $scope.loading = true;
         gapi.client.conference.getConference({
-            websafeConferenceKey: $routeParams.websafeConferenceKey
+            conferenceWSKey: $routeParams.conferenceWSKey
         }).execute(function (resp) {
             $scope.$apply(function () {
                 $scope.loading = false;
@@ -589,7 +589,7 @@ conferenceApp.controllers.controller('ConferenceDetailCtrl', function ($scope, $
                 } else {
                     var profile = resp.result;
                     for (var i = 0; i < profile.conferenceKeysToAttend.length; i++) {
-                        if ($routeParams.websafeConferenceKey == profile.conferenceKeysToAttend[i]) {
+                        if ($routeParams.conferenceWSKey == profile.conferenceKeysToAttend[i]) {
                             // The user is attending the conference.
                             $scope.alertStatus = 'info';
                             $scope.messages = 'You are attending this conference';
@@ -608,7 +608,7 @@ conferenceApp.controllers.controller('ConferenceDetailCtrl', function ($scope, $
     $scope.registerForConference = function () {
         $scope.loading = true;
         gapi.client.conference.registerForConference({
-            websafeConferenceKey: $routeParams.websafeConferenceKey
+            conferenceWSKey: $routeParams.conferenceWSKey
         }).execute(function (resp) {
             $scope.$apply(function () {
                 $scope.loading = false;
@@ -645,7 +645,7 @@ conferenceApp.controllers.controller('ConferenceDetailCtrl', function ($scope, $
     $scope.unregisterFromConference = function () {
         $scope.loading = true;
         gapi.client.conference.unregisterFromConference({
-            websafeConferenceKey: $routeParams.websafeConferenceKey
+            conferenceWSKey: $routeParams.conferenceWSKey
         }).execute(function (resp) {
             $scope.$apply(function () {
                 $scope.loading = false;
